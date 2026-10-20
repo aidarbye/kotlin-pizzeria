@@ -15,3 +15,11 @@ fun OrderStatus.toText(): String = when (this) {
     OrderStatus.Delivering -> "Курьер в пути"
     OrderStatus.Received -> "Принят"
 }
+
+fun OrderStatus.progress(): Float = when (this) {
+    is OrderStatus.Cancelled -> 0f
+    is OrderStatus.Cooking -> 0.1f + progress / 100f * 0.6f
+    is OrderStatus.Delivered -> 1f
+    OrderStatus.Delivering -> 0.85f
+    OrderStatus.Received -> 0.05f
+}

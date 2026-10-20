@@ -1,41 +1,75 @@
-# Kotlin Pizzeria
+# Pizzeria Roma Android (HW2)
 
-A small Kotlin/JVM console application that simulates a pizzeria: a menu with pizzas, drinks and desserts, customer orders, and asynchronous order processing (cooking and delivery) with coroutines.
+An Android app built with Kotlin, Jetpack Compose, Material 3 and a ViewModel. It continues HW1 (the Kotlin console pizzeria): the same models (`MenuItem`, `Pizza`, `Drink`, `Dessert`, `Order`, sealed `OrderStatus`) and the `Pizzeria` business logic now power a real UI.
+
+The user can browse the menu, search and filter it, build a cart, place an order and watch it go through cooking and delivery in real time.
 
 ## How to run
 
-Requirements: JDK 21 and IntelliJ IDEA (Kotlin/JVM project, Gradle).
+Requirements: Android Studio (recent, AGP 9), JDK 21, Android SDK 36.
 
-1. Open the project folder in IntelliJ IDEA and wait for the Gradle sync to finish (it downloads `kotlinx-coroutines-core`).
-2. Open `src/main/kotlin/com/example/Main.kt`.
-3. Click the green run icon next to `fun main()`.
+1. Open the project folder in Android Studio and wait for Gradle sync.
+2. Pick an emulator or device (Android 8.0+, API 26) and run the `app` configuration.
 
-The program prints the menu, processes three orders in parallel (status updates of different orders interleave in the log) and finishes with statistics.
+From the command line: `./gradlew :app:installDebug`.
 
 ## Project structure
 
 ```
-src/main/kotlin/com/example/
- ├─ Main.kt                  entry point, creates the menu and orders, launches coroutines
- ├─ contract/Preparable.kt   interface
- ├─ model/
- │   ├─ Models.kt            MenuItem, Pizza, Drink, Dessert
- │   ├─ Order.kt             Customer, OrderLine, Order
- │   └─ OrderStatus.kt       sealed class + extension function toText()
- └─ service/Pizzeria.kt      business logic, collections, higher-order functions, suspend function
+app/src/main/java/com/example/
+ ├─ MainActivity.kt                  entry point, logs Activity lifecycle
+ ├─ contract/Preparable.kt           interface (from HW1)
+ ├─ model/                           Models.kt, Order.kt, OrderStatus.kt (from HW1), Category.kt
+ ├─ service/Pizzeria.kt              business logic from HW1: search, discounts, stats, processOrder
+ ├─ data/SampleData.kt               the menu (was in HW1 Main.kt)
+ └─ ui/
+     ├─ PizzeriaUiState.kt           immutable screen state
+     ├─ PizzeriaViewModel.kt         state + logic, exposes StateFlow, handles events
+     ├─ PizzeriaApp.kt               Scaffold, top bar, bottom navigation, connects VM to screens
+     ├─ theme/Theme.kt               Material 3 color scheme (light + dark), shapes
+     ├─ components/                  reusable composables
+     └─ screens/                     MenuScreen, OrdersScreen
 ```
 
 ## Where the requirements are demonstrated
 
 | Requirement | Where |
 |---|---|
-| Variables, data types, conditions, loops | everywhere: `if` and `for` in `Pizzeria.processOrder`, `for` in `Pizzeria.printMenu`, `when` in `OrderStatus.toText()` |
-| List, Set, Map | `List` for the menu and order lines; `Set` for pizza toppings and `Pizzeria.allToppings()`; `Map` in `Pizzeria.ordersByStatus()` and `Pizzeria.popularity()` |
-| map, filter, reduce | `Pizzeria.vegetarianPizzas()` (filter), `Pizzeria.popularity()` (map/flatMap/groupBy), `Pizzeria.totalRevenue()` (map + reduce), `Order.total()` (sumOf) |
-| Functions, higher-order functions, lambdas | `Pizzeria.filterMenu(predicate)` and `Pizzeria.totalWithDiscount(order, rule)` take functions as parameters; called with lambdas in `Main.kt` |
-| Classes and objects | `Pizzeria`, `Order`, `MenuItem` and its subclasses |
-| Inheritance | `abstract class MenuItem` is extended by `Pizza`, `Drink`, `Dessert` (`Models.kt`) |
-| Interfaces and polymorphism | `Preparable` is implemented by `Pizza` and `Dessert`; `describe()` is overridden in every subclass and called through `List<MenuItem>` |
-| Data class | `Customer`, `OrderLine` (and the data subclasses of `OrderStatus`) |
-| Sealed class | `OrderStatus` (`Received`, `Cooking`, `Delivering`, `Delivered`, `Cancelled`), handled with an exhaustive `when` |
-| Suspend function and coroutine | `Pizzeria.processOrder` is a `suspend` function using `delay`; `Main.kt` starts one coroutine per order with `launch` inside `runBlocking` and waits with `joinAll` |
+| Kotlin + Compose + Material 3, consistent styling | `PizzeriaTheme` with a custom color scheme; Material 3 `Scaffold`, `CenterAlignedTopAppBar`, `NavigationBar`, `Card`, `FilterChip`, `AlertDialog`, `Badge` |
+| ≥ 3 reusable composables | `SearchField`, `CategoryFilterRow`, `LabeledCheckbox`, `MenuItemCard`, `MenuItemImage`, `QuantityStepper`, `CartBar`, `OrderCard`, `StatusLabel`, `StatsCard`, `CheckoutDialog` |
+| `Row`, `Column`, `Box` | `MenuItemCard` (Row of image + Column of texts), `MenuItemImage` (Box to center the image in a circle), `OrdersScreen` empty state (Box + Column) |
+| `LazyColumn`, `Card`, `Text`, `Image` | menu and orders lists are `LazyColumn`s of `Card`s; `MenuItemImage` uses `Image` |
+| User interactions | search, category filter, vegetarian filter, add/remove from cart, checkout with discount, cancel an order, expand a card |
+| Input components | `OutlinedTextField` (search, name, address), `Checkbox` (vegetarian only, student discount), `Button`, `FilterChip`, icon buttons |
+| UI updates on actions | every event goes to the ViewModel, which emits a new `PizzeriaUiState`; order status updates arrive from a coroutine |
+| `remember` / `rememberSaveable` | `remember`: expanded state in `MenuItemCard`; `rememberSaveable`: selected tab, open dialog, checkout form fields |
+| ViewModel, UI separated from state | `PizzeriaViewModel` owns all state and logic; screens are stateless and only get values + callbacks (state hoisting). Only `PizzeriaApp` touches the ViewModel |
+| Behavior on Activity recreation | see the scenario below |
+
+## remember vs rememberSaveable vs ViewModel
+
+| | Where it lives | Rotation | Process death | Use for |
+|---|---|---|---|---|
+| `remember` | in the composition | **lost** | lost | cheap UI-only state you can lose (card expanded, animation) |
+| `rememberSaveable` | composition + saved instance state `Bundle` | kept | **kept** | small UI state the user expects back (typed text, selected tab, dialog open). Only Bundle-able types, small size |
+| `ViewModel` | `ViewModelStore`, outside the Activity | kept | **lost** (unless `SavedStateHandle`) | screen state and business logic, long-running work (`viewModelScope`) |
+
+How it shows up in the app itself do these, then rotate the device:
+
+| Do this | After rotation | Why |
+|---|---|---|
+| Tap a menu card to expand its description | collapsed again | `remember` in `MenuItemCard`: it lives in the composition, which is rebuilt with the new Activity |
+| Open "Оформить", type name and address, tick the discount | dialog still open, text and checkbox kept | `rememberSaveable` in `CheckoutDialog` / `PizzeriaApp`: written to the saved instance state Bundle |
+| Switch to the "Заказы" tab | still on "Заказы" | selected tab is `rememberSaveable` |
+| Type a search query, pick a category, add items to the cart | query, filters and cart kept | stored in `PizzeriaViewModel`, the same instance is reused |
+| Place an order and rotate while it is "Готовится" | progress keeps going | `processOrder` runs in `viewModelScope`, not tied to the Activity |
+
+Process death (put the app in background, then `adb shell am kill com.example.pizzeria`, or *Developer options → Don't keep activities*, and reopen): the selected tab and an open checkout form come back (`rememberSaveable`), but the cart and orders are gone the ViewModel was recreated from scratch.
+
+Logcat (tag `PizzeriaLifecycle`) shows `onDestroy, isChangingConfigurations=true` and a new `onCreate` on every rotation, while `ViewModel created` appears only once.
+
+## What changed from HW1
+
+- `MenuItem` got an `id` and `details()`; `Order` became an immutable data class (status changes create a copy so Compose notices them).
+- `Pizzeria` no longer prints or stores orders: it is pure logic. `processOrder` reports statuses through a lambda (`onStatus`) instead of `println`, and the ViewModel runs it in `viewModelScope`.
+- Higher-order functions are still used: `filterMenu(predicate)` powers search, `totalWithDiscount(order, rule)` applies the student discount.

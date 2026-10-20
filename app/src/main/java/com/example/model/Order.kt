@@ -13,12 +13,15 @@ data class OrderLine(
         get() = item.price * quantity
 }
 
-class Order(
+data class Order(
     val id: Int,
     val customer: Customer,
-    val lines: List<OrderLine>
+    val lines: List<OrderLine>,
+    val status: OrderStatus = OrderStatus.Received,
+    val paid: Double = lines.sumOf { it.subtotal }
 ) {
-    var status: OrderStatus = OrderStatus.Received
-
     fun total(): Double = lines.sumOf { it.subtotal }
+
+    val isActive: Boolean
+        get() = status is OrderStatus.Received || status is OrderStatus.Cooking
 }
