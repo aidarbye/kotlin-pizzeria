@@ -2,10 +2,14 @@ package com.example.service
 
 import com.example.contract.Preparable
 import com.example.model.Category
+import com.example.model.DeliveryType
 import com.example.model.MenuItem
 import com.example.model.Order
+import com.example.model.OrderLine
 import com.example.model.OrderStatus
 import com.example.model.Pizza
+import com.example.model.PriceQuote
+import com.example.model.PromoCode
 import com.example.model.isVegetarian
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
@@ -13,15 +17,22 @@ import kotlin.time.Duration.Companion.milliseconds
 class Pizzeria(
     val name: String,
     val menu: List<MenuItem>,
+    private val promoCodes: List<PromoCode>,
     private val timeScale: Long = 3L
 ) {
     fun filterMenu(predicate: (MenuItem) -> Boolean): List<MenuItem> = menu.filter(predicate)
 
-    fun search(query: String, category: Category, vegetarianOnly: Boolean): List<MenuItem> {
+    fun search(
+        query: String,
+        category: Category,
+        vegetarianOnly: Boolean,
+        favoriteIds: Set<Int>? = null
+    ): List<MenuItem> {
         val text = query.trim()
         return filterMenu { item ->
             category.matches(item) &&
                 (!vegetarianOnly || item.isVegetarian) &&
+                (favoriteIds == null || item.id in favoriteIds) &&
                 (text.isEmpty() ||
                     item.name.contains(text, ignoreCase = true) ||
                     (item is Pizza && item.toppings.any { it.contains(text, ignoreCase = true) }))
@@ -30,25 +41,29 @@ class Pizzeria(
 
     fun findItem(id: Int): MenuItem? = menu.find { it.id == id }
 
-    fun vegetarianPizzas(): List<Pizza> = menu.filterIsInstance<Pizza>().filter { it.isVegetarian }
+    fun findPromo(code: String): PromoCode? = promoCodes.find { it.code.equals(code.trim(), ignoreCase = true) }
 
-    fun totalWithDiscount(order: Order, rule: (Double) -> Double): Double = rule(order.total())
+    fun quote(lines: List<OrderLine>, promo: PromoCode?, deliveryType: DeliveryType): PriceQuote {
+        val subtotal = lines.sumOf { it.subtotal }
+        val deliveryFee = when {
+            deliveryType == DeliveryType.PICKUP -> 0.0
+            promo?.freeDelivery == true -> 0.0
+            subtotal >= FREE_DELIVERY_FROM -> 0.0
+            else -> DELIVERY_FEE
+        }
+        return PriceQuote(subtotal, promo?.discountFor(subtotal) ?: 0.0, deliveryFee)
+    }
 
     fun totalRevenue(orders: List<Order>): Double =
         orders.filter { it.status !is OrderStatus.Cancelled }
-            .map { it.paid }
+            .map { it.quote.total }
             .reduceOrNull { acc, sum -> acc + sum } ?: 0.0
-
-    fun ordersByStatus(orders: List<Order>): Map<String, List<Order>> =
-        orders.groupBy { it.status::class.simpleName ?: "Unknown" }
 
     fun popularity(orders: List<Order>): Map<String, Int> =
         orders.filter { it.status !is OrderStatus.Cancelled }
             .flatMap { it.lines }
             .groupBy { it.item.name }
             .mapValues { (_, lines) -> lines.sumOf { it.quantity } }
-
-    fun allToppings(): Set<String> = menu.filterIsInstance<Pizza>().flatMap { it.toppings }.toSet()
 
     suspend fun processOrder(order: Order, onStatus: (OrderStatus) -> Unit) {
         if (order.lines.isEmpty()) {
@@ -67,8 +82,15 @@ class Pizzeria(
             onStatus(OrderStatus.Cooking(progress))
         }
 
-        onStatus(OrderStatus.Delivering)
-        delay((1000 * timeScale).milliseconds)
+        if (order.deliveryType == DeliveryType.DELIVERY) {
+            onStatus(OrderStatus.Delivering)
+            delay((1500 * timeScale).milliseconds)
+        }
         onStatus(OrderStatus.Delivered(minutes = 15 + order.lines.size * 5))
+    }
+
+    companion object {
+        const val DELIVERY_FEE = 2.5
+        const val FREE_DELIVERY_FROM = 30.0
     }
 }

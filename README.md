@@ -1,75 +1,126 @@
-# Pizzeria Roma Android (HW2)
+# Pizzeria Roma (Midterm, Part 1)
 
-An Android app built with Kotlin, Jetpack Compose, Material 3 and a ViewModel. It continues HW1 (the Kotlin console pizzeria): the same models (`MenuItem`, `Pizza`, `Drink`, `Dessert`, `Order`, sealed `OrderStatus`) and the `Pizzeria` business logic now power a real UI.
+An Android app for ordering food from a pizzeria, built with Kotlin, Jetpack Compose, Material 3, Navigation Compose and ViewModel + StateFlow. It continues HW1 (the console pizzeria) and HW2 (the first Compose version).
 
-The user can browse the menu, search and filter it, build a cart, place an order and watch it go through cooking and delivery in real time.
+The user can find a dish in the menu, customize a pizza (size and extra toppings), collect a cart, apply a promo code, choose delivery or pickup, place an order and watch it go through cooking and delivery in real time. Past orders can be repeated in one tap.
+
+## Screenshots
+
+| Menu | Pizza customization | Cart with promo code |
+|---|---|---|
+| ![Menu](screenshots/menu.png) | ![Details](screenshots/details.png) | ![Cart](screenshots/cart.png) |
+
+| Checkout with validation | Order tracking | Orders and stats |
+|---|---|---|
+| ![Checkout](screenshots/checkout.png) | ![Order details](screenshots/order_details.png) | ![Orders](screenshots/orders.png) |
+
+## Features
+
+1. **Menu with search and filters.** Search by name or topping, category chips (pizza, drinks, desserts), "Vegetarian" and "Favorites" toggles. Labels for vegetarian, spicy and sugar-free dishes. Quick "+" adds a medium pizza and shows a snackbar with a shortcut to the cart.
+2. **Favorites.** The heart on a card or on the details screen adds a dish to favorites; the "Favorites" filter shows only them.
+3. **Pizza customization.** The details screen lets you pick a size (25 / 30 / 35 cm, the price changes), extra toppings (double cheese, bacon, cheese crust, ...) and quantity. The same pizza with different options becomes separate cart lines.
+4. **Cart and promo codes.** Change quantity, delete lines, apply a promo code:
+   - `STUDENT10` 10% off,
+   - `ROMA5` $5 off for orders from $25 (the app explains when the condition is not met),
+   - `FREESHIP` free delivery.
+5. **Checkout.** Delivery or pickup (delivery costs $2.50, free from $30). Name, phone and address are validated, errors appear after the first submit attempt. The final price is broken down into items, discount and delivery.
+6. **Live order tracking.** After ordering, a coroutine moves the order through "Accepted → Cooking → On the way → Delivered" (pickup skips delivery). The details screen shows a step timeline and progress; the order can be cancelled until it is handed to the courier (with a confirmation dialog).
+7. **Order history.** Active and finished orders, total spent and most ordered dishes. "Repeat order" puts the same lines back into the cart.
+
+Badges on the bottom bar show the number of items in the cart and active orders.
 
 ## How to run
 
 Requirements: Android Studio (recent, AGP 9), JDK 21, Android SDK 36.
 
-1. Open the project folder in Android Studio and wait for Gradle sync.
-2. Pick an emulator or device (Android 8.0+, API 26) and run the `app` configuration.
+1. Clone the repository and open the folder in Android Studio, wait for Gradle sync.
+2. Pick an emulator or a device (Android 8.0+, API 26) and run the `app` configuration.
 
 From the command line: `./gradlew :app:installDebug`.
 
-## Project structure
+## Architecture
 
 ```
 app/src/main/java/com/example/
- ├─ MainActivity.kt                  entry point, logs Activity lifecycle
- ├─ contract/Preparable.kt           interface (from HW1)
- ├─ model/                           Models.kt, Order.kt, OrderStatus.kt (from HW1), Category.kt
- ├─ service/Pizzeria.kt              business logic from HW1: search, discounts, stats, processOrder
- ├─ data/SampleData.kt               the menu (was in HW1 Main.kt)
+ ├─ MainActivity.kt              entry point, logs Activity lifecycle
+ ├─ PizzeriaApplication.kt       creates the AppContainer
+ ├─ contract/Preparable.kt       interface from HW1
+ ├─ model/                       MenuItem / Pizza / Drink / Dessert, PizzaSize, Extra,
+ │                               OrderLine, Order, PriceQuote, sealed OrderStatus, PromoCode
+ ├─ service/Pizzeria.kt          business logic: search, price quote, stats, processOrder
+ ├─ data/
+ │   ├─ SampleData.kt            menu, extras, promo codes
+ │   ├─ MenuRepository.kt        menu + favorites (StateFlow)
+ │   ├─ CartRepository.kt        cart lines + applied promo (StateFlow)
+ │   ├─ OrderRepository.kt       orders (StateFlow), runs order processing in an app scope
+ │   └─ AppContainer.kt          manual dependency injection
  └─ ui/
-     ├─ PizzeriaUiState.kt           immutable screen state
-     ├─ PizzeriaViewModel.kt         state + logic, exposes StateFlow, handles events
-     ├─ PizzeriaApp.kt               Scaffold, top bar, bottom navigation, connects VM to screens
-     ├─ theme/Theme.kt               Material 3 color scheme (light + dark), shapes
-     ├─ components/                  reusable composables
-     └─ screens/                     MenuScreen, OrdersScreen
+     ├─ PizzeriaApp.kt           Scaffold, bottom NavigationBar, NavHost
+     ├─ navigation/Routes.kt     type-safe routes and top-level tabs
+     ├─ AppViewModelProvider.kt  ViewModel factory (repositories + SavedStateHandle)
+     ├─ MainViewModel.kt         badges for the bottom bar
+     ├─ menu/  details/  cart/  checkout/  orders/   screen + ViewModel per feature
+     ├─ components/              reusable composables
+     └─ theme/Theme.kt           Material 3 color scheme (light + dark), shapes
 ```
 
-## Where the requirements are demonstrated
+Layers:
 
-| Requirement | Where |
-|---|---|
-| Kotlin + Compose + Material 3, consistent styling | `PizzeriaTheme` with a custom color scheme; Material 3 `Scaffold`, `CenterAlignedTopAppBar`, `NavigationBar`, `Card`, `FilterChip`, `AlertDialog`, `Badge` |
-| ≥ 3 reusable composables | `SearchField`, `CategoryFilterRow`, `LabeledCheckbox`, `MenuItemCard`, `MenuItemImage`, `QuantityStepper`, `CartBar`, `OrderCard`, `StatusLabel`, `StatsCard`, `CheckoutDialog` |
-| `Row`, `Column`, `Box` | `MenuItemCard` (Row of image + Column of texts), `MenuItemImage` (Box to center the image in a circle), `OrdersScreen` empty state (Box + Column) |
-| `LazyColumn`, `Card`, `Text`, `Image` | menu and orders lists are `LazyColumn`s of `Card`s; `MenuItemImage` uses `Image` |
-| User interactions | search, category filter, vegetarian filter, add/remove from cart, checkout with discount, cancel an order, expand a card |
-| Input components | `OutlinedTextField` (search, name, address), `Checkbox` (vegetarian only, student discount), `Button`, `FilterChip`, icon buttons |
-| UI updates on actions | every event goes to the ViewModel, which emits a new `PizzeriaUiState`; order status updates arrive from a coroutine |
-| `remember` / `rememberSaveable` | `remember`: expanded state in `MenuItemCard`; `rememberSaveable`: selected tab, open dialog, checkout form fields |
-| ViewModel, UI separated from state | `PizzeriaViewModel` owns all state and logic; screens are stateless and only get values + callbacks (state hoisting). Only `PizzeriaApp` touches the ViewModel |
-| Behavior on Activity recreation | see the scenario below |
+- **UI** (composables) only draws state and sends events up. Each feature has a stateful `XxxScreen` that gets the ViewModel and collects its state, and a stateless `XxxContent` that receives values and callbacks (state hoisting).
+- **ViewModels** turn repository flows into a screen state with `combine` / `map` + `stateIn(viewModelScope, WhileSubscribed(5000))` and expose it as `StateFlow`. Screens collect it with `collectAsStateWithLifecycle()`, so collection stops when the app is in the background.
+- **Repositories** hold the shared app state in `MutableStateFlow` and are shared between screens (cart is changed on the menu, details, cart and order screens).
+- **`Pizzeria`** is plain Kotlin logic without Android dependencies.
 
-## remember vs rememberSaveable vs ViewModel
+Order processing is a `suspend` function started in the application `CoroutineScope` inside `OrderRepository`, not in a ViewModel, because the order must keep going when the user leaves the screen and its ViewModel is cleared.
 
-| | Where it lives | Rotation | Process death | Use for |
-|---|---|---|---|---|
-| `remember` | in the composition | **lost** | lost | cheap UI-only state you can lose (card expanded, animation) |
-| `rememberSaveable` | composition + saved instance state `Bundle` | kept | **kept** | small UI state the user expects back (typed text, selected tab, dialog open). Only Bundle-able types, small size |
-| `ViewModel` | `ViewModelStore`, outside the Activity | kept | **lost** (unless `SavedStateHandle`) | screen state and business logic, long-running work (`viewModelScope`) |
+## Navigation
 
-How it shows up in the app itself do these, then rotate the device:
+Navigation Compose with type-safe `@Serializable` routes:
 
-| Do this | After rotation | Why |
+| Route | Screen | Arguments |
 |---|---|---|
-| Tap a menu card to expand its description | collapsed again | `remember` in `MenuItemCard`: it lives in the composition, which is rebuilt with the new Activity |
-| Open "Оформить", type name and address, tick the discount | dialog still open, text and checkbox kept | `rememberSaveable` in `CheckoutDialog` / `PizzeriaApp`: written to the saved instance state Bundle |
-| Switch to the "Заказы" tab | still on "Заказы" | selected tab is `rememberSaveable` |
-| Type a search query, pick a category, add items to the cart | query, filters and cart kept | stored in `PizzeriaViewModel`, the same instance is reused |
-| Place an order and rotate while it is "Готовится" | progress keeps going | `processOrder` runs in `viewModelScope`, not tied to the Activity |
+| `MenuRoute` | menu (start, tab) | |
+| `CartRoute` | cart (tab) | |
+| `OrdersRoute` | orders (tab) | |
+| `ItemDetailsRoute` | dish details | `itemId` |
+| `CheckoutRoute` | checkout | |
+| `OrderDetailsRoute` | order tracking | `orderId` |
 
-Process death (put the app in background, then `adb shell am kill com.example.pizzeria`, or *Developer options → Don't keep activities*, and reopen): the selected tab and an open checkout form come back (`rememberSaveable`), but the cart and orders are gone the ViewModel was recreated from scratch.
+- Tabs are switched with `popUpTo(start) { saveState = true }`, `launchSingleTop` and `restoreState`, so each tab keeps its scroll and filters.
+- Arguments are read in the ViewModel with `savedStateHandle.toRoute<ItemDetailsRoute>()`.
+- After an order is placed, checkout and cart are removed from the back stack (`popUpTo(CartRoute) { inclusive = true }`), so "Back" from the order screen does not return to an empty checkout.
+- The bottom bar is shown only on top-level destinations.
 
-Logcat (tag `PizzeriaLifecycle`) shows `onDestroy, isChangingConfigurations=true` and a new `onCreate` on every rotation, while `ViewModel created` appears only once.
+## State: remember, rememberSaveable, ViewModel
 
-## What changed from HW1
+| Where | What | Why |
+|---|---|---|
+| `remember` | `SnackbarHostState` on the menu | UI object, nothing to restore |
+| `rememberSaveable` | checkout fields, "submitted" flag, promo code input, cancel dialog | the user expects typed text and an open dialog to survive rotation and process death |
+| `SavedStateHandle` | selected size, extras and quantity on the details screen, delivery type at checkout | screen state that lives in the ViewModel but must survive process death |
+| ViewModel / repositories | menu filters, cart, favorites, orders | survive configuration changes, shared between screens |
 
-- `MenuItem` got an `id` and `details()`; `Order` became an immutable data class (status changes create a copy so Compose notices them).
-- `Pizzeria` no longer prints or stores orders: it is pure logic. `processOrder` reports statuses through a lambda (`onStatus`) instead of `println`, and the ViewModel runs it in `viewModelScope`.
-- Higher-order functions are still used: `filterMenu(predicate)` powers search, `totalWithDiscount(order, rule)` applies the student discount.
+## Configuration changes
+
+Rotate the device at any step:
+
+- the back stack and the current tab stay (NavController state is saved);
+- ViewModels are reused: filters, search text, cart and selected options are kept;
+- typed checkout fields and validation errors are kept (`rememberSaveable`);
+- orders keep progressing, because the coroutine does not depend on the Activity.
+
+Logcat (tag `PizzeriaLifecycle`) shows `onDestroy, isChangingConfigurations=true` and a new `onCreate` on each rotation, while `MainViewModel created` appears only once.
+
+Data is kept in memory for now, so after the process is killed the cart and orders are empty. A database is planned for the second part of the course.
+
+## Reusable components
+
+`PizzeriaTopBar`, `SummaryBar`, `EmptyState`, `SectionTitle`, `InfoLabel`, `LabeledCheckbox`, `QuantityStepper`, `PriceRow`, `PriceBreakdown`, `SearchField`, `CategoryFilterRow`, `ToggleChip`, `MenuItemImage`, `FavoriteButton`, `ItemLabels`, `MenuItemCard`, `CartLineCard`, `PromoCodeField`, `OrderCard`, `StatusLabel`, `StatusTimeline`, `OrderLineRow`, `StatsCard`.
+
+## Kotlin features used
+
+- abstract class, inheritance and interface (`MenuItem`, `Pizza`, `Preparable`), enums with properties (`PizzaSize`, `Category`, `DeliveryType`), sealed class `OrderStatus` with exhaustive `when`, data classes with `copy`.
+- extension functions and properties (`priceFor`, `formatPrice`, `isVegetarian`, `toText`).
+- higher-order functions and lambdas (`filterMenu(predicate)`, promo code `discountRule`).
+- collections: `filter`, `map`, `groupBy`, `partition`, `sumOf`, `flatMap`, `mapValues`, sets of favorites and extras.
+- coroutines and flows: `delay`, `launch`, `Job.cancel`, `MutableStateFlow.update`, `combine`, `map`, `stateIn`.

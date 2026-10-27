@@ -1,14 +1,10 @@
 package com.example.ui
 
-import androidx.annotation.DrawableRes
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -16,57 +12,60 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.R
-import com.example.ui.components.CartBar
-import com.example.ui.components.CheckoutDialog
-import com.example.ui.screens.MenuScreen
-import com.example.ui.screens.OrdersScreen
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.ui.cart.CartScreen
+import com.example.ui.checkout.CheckoutScreen
+import com.example.ui.details.ItemDetailsScreen
+import com.example.ui.menu.MenuScreen
+import com.example.ui.navigation.CartRoute
+import com.example.ui.navigation.CheckoutRoute
+import com.example.ui.navigation.ItemDetailsRoute
+import com.example.ui.navigation.MenuRoute
+import com.example.ui.navigation.OrderDetailsRoute
+import com.example.ui.navigation.OrdersRoute
+import com.example.ui.navigation.TopLevelTab
+import com.example.ui.orders.OrderDetailsScreen
+import com.example.ui.orders.OrdersScreen
 
-enum class AppTab(val title: String, @DrawableRes val icon: Int) {
-    MENU("Меню", R.drawable.ic_pizza),
-    ORDERS("Заказы", R.drawable.ic_orders)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PizzeriaApp(viewModel: PizzeriaViewModel = viewModel()) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-    var selectedTab by rememberSaveable { mutableStateOf(AppTab.MENU) }
-    var showCheckout by rememberSaveable { mutableStateOf(false) }
-    val tabStateHolder = rememberSaveableStateHolder()
+fun PizzeriaApp(
+    navController: NavHostController = rememberNavController(),
+    mainViewModel: MainViewModel = viewModel(factory = AppViewModelProvider.Factory)
+) {
+    val badges by mainViewModel.badges.collectAsStateWithLifecycle()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val destination = backStackEntry?.destination
+    val showBottomBar = TopLevelTab.entries.any { destination.isOnTab(it) }
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(title = { Text("Пиццерия ${state.pizzeriaName}") })
-        },
+        contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            Column {
-                if (selectedTab == AppTab.MENU && state.cartCount > 0) {
-                    CartBar(
-                        count = state.cartCount,
-                        total = state.cartTotal,
-                        onCheckout = { showCheckout = true }
-                    )
-                }
+            if (showBottomBar) {
                 NavigationBar {
-                    AppTab.entries.forEach { tab ->
+                    TopLevelTab.entries.forEach { tab ->
                         NavigationBarItem(
-                            selected = tab == selectedTab,
-                            onClick = { selectedTab = tab },
+                            selected = destination.isOnTab(tab),
+                            onClick = { navController.navigateToTab(tab) },
                             icon = {
                                 BadgedBox(badge = {
-                                    if (tab == AppTab.ORDERS && state.activeOrders > 0) {
-                                        Badge { Text(state.activeOrders.toString()) }
+                                    val count = when (tab) {
+                                        TopLevelTab.CART -> badges.cartCount
+                                        TopLevelTab.ORDERS -> badges.activeOrders
+                                        TopLevelTab.MENU -> 0
                                     }
+                                    if (count > 0) Badge { Text(count.toString()) }
                                 }) {
                                     Icon(painterResource(tab.icon), contentDescription = null)
                                 }
@@ -78,42 +77,61 @@ fun PizzeriaApp(viewModel: PizzeriaViewModel = viewModel()) {
             }
         }
     ) { padding ->
-        Box(
+        NavHost(
+            navController = navController,
+            startDestination = MenuRoute,
             modifier = Modifier
-                .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
         ) {
-            tabStateHolder.SaveableStateProvider(selectedTab.name) {
-                when (selectedTab) {
-                    AppTab.MENU -> MenuScreen(
-                        state = state,
-                        onQueryChange = viewModel::onQueryChange,
-                        onCategorySelect = viewModel::onCategorySelect,
-                        onVegetarianOnlyChange = viewModel::onVegetarianOnlyChange,
-                        onAdd = viewModel::addToCart,
-                        onRemove = viewModel::removeFromCart
-                    )
-
-                    AppTab.ORDERS -> OrdersScreen(
-                        orders = state.orders,
-                        revenue = state.revenue,
-                        popularity = state.popularity,
-                        onCancel = viewModel::cancelOrder
-                    )
-                }
+            composable<MenuRoute> {
+                MenuScreen(
+                    onOpenItem = { id -> navController.navigate(ItemDetailsRoute(id)) },
+                    onOpenCart = { navController.navigateToTab(TopLevelTab.CART) }
+                )
+            }
+            composable<ItemDetailsRoute> {
+                ItemDetailsScreen(onBack = { navController.popBackStack() })
+            }
+            composable<CartRoute> {
+                CartScreen(
+                    onCheckout = { navController.navigate(CheckoutRoute) },
+                    onOpenMenu = { navController.navigateToTab(TopLevelTab.MENU) }
+                )
+            }
+            composable<CheckoutRoute> {
+                CheckoutScreen(
+                    onBack = { navController.popBackStack() },
+                    onOrderPlaced = { orderId ->
+                        navController.navigate(OrderDetailsRoute(orderId)) {
+                            popUpTo(CartRoute) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable<OrdersRoute> {
+                OrdersScreen(
+                    onOpenOrder = { id -> navController.navigate(OrderDetailsRoute(id)) },
+                    onOpenMenu = { navController.navigateToTab(TopLevelTab.MENU) }
+                )
+            }
+            composable<OrderDetailsRoute> {
+                OrderDetailsScreen(
+                    onBack = { navController.popBackStack() },
+                    onRepeated = { navController.navigateToTab(TopLevelTab.CART) }
+                )
             }
         }
     }
+}
 
-    if (showCheckout) {
-        CheckoutDialog(
-            total = state.cartTotal,
-            onDismiss = { showCheckout = false },
-            onConfirm = { name, address, discount ->
-                viewModel.checkout(name, address, discount)
-                showCheckout = false
-                selectedTab = AppTab.ORDERS
-            }
-        )
+private fun NavDestination?.isOnTab(tab: TopLevelTab): Boolean =
+    this?.hierarchy?.any { it.hasRoute(tab.route::class) } == true
+
+private fun NavHostController.navigateToTab(tab: TopLevelTab) {
+    navigate(tab.route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }

@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -14,33 +13,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.SampleData
@@ -49,8 +40,8 @@ import com.example.model.Dessert
 import com.example.model.Drink
 import com.example.model.MenuItem
 import com.example.model.Pizza
+import com.example.model.PizzaSize
 import com.example.model.formatPrice
-import com.example.model.isVegetarian
 import com.example.ui.theme.PizzeriaTheme
 
 @Composable
@@ -98,26 +89,27 @@ fun CategoryFilterRow(
 }
 
 @Composable
-fun LabeledCheckbox(
+fun ToggleChip(
     text: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
+    selected: Boolean,
+    onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange)
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(checked = checked, onCheckedChange = null)
-        Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium)
-    }
+    FilterChip(
+        selected = selected,
+        onClick = { onToggle(!selected) },
+        label = { Text(text) },
+        modifier = modifier,
+        leadingIcon = if (selected) {
+            { Icon(painterResource(R.drawable.ic_check), contentDescription = null, modifier = Modifier.size(18.dp)) }
+        } else {
+            null
+        }
+    )
 }
 
 @Composable
-fun MenuItemImage(item: MenuItem, modifier: Modifier = Modifier) {
+fun MenuItemImage(item: MenuItem, modifier: Modifier = Modifier, size: Dp = 64.dp) {
     val (icon, background) = when (item) {
         is Pizza -> R.drawable.ic_pizza to MaterialTheme.colorScheme.primaryContainer
         is Drink -> R.drawable.ic_drink to MaterialTheme.colorScheme.secondaryContainer
@@ -126,129 +118,112 @@ fun MenuItemImage(item: MenuItem, modifier: Modifier = Modifier) {
     }
     Box(
         modifier = modifier
-            .size(64.dp)
+            .size(size)
             .background(background, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(icon),
             contentDescription = item.name,
-            modifier = Modifier.size(36.dp),
+            modifier = Modifier.size(size * 0.56f),
             colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
         )
     }
 }
 
 @Composable
-fun QuantityStepper(
-    quantity: Int,
-    onAdd: () -> Unit,
-    onRemove: () -> Unit,
+fun FavoriteButton(
+    isFavorite: Boolean,
+    onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        FilledTonalIconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
-            Icon(painterResource(R.drawable.ic_remove), contentDescription = "Убрать")
-        }
-        Text(
-            text = quantity.toString(),
-            modifier = Modifier.padding(horizontal = 12.dp),
-            style = MaterialTheme.typography.titleMedium
+    IconButton(onClick = onToggle, modifier = modifier) {
+        Icon(
+            painter = painterResource(if (isFavorite) R.drawable.ic_favorite else R.drawable.ic_favorite_border),
+            contentDescription = if (isFavorite) "Убрать из избранного" else "В избранное",
+            tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
-        FilledTonalIconButton(onClick = onAdd, modifier = Modifier.size(36.dp)) {
-            Icon(painterResource(R.drawable.ic_add), contentDescription = "Добавить")
-        }
     }
 }
 
 @Composable
-fun VegetarianLabel(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.tertiaryContainer
-    ) {
-        Text(
-            text = "вегетарианская",
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onTertiaryContainer
-        )
+fun ItemLabels(item: MenuItem, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val labels = buildList {
+        if (item is Pizza && item.isVegetarian) add("вегетарианская")
+        if (item is Pizza && item.isSpicy) add("острая")
+        if (item is Dessert && item.isSugarFree) add("без сахара")
+    }
+    if (labels.isEmpty()) return
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        labels.forEach { label ->
+            val spicy = label == "острая"
+            InfoLabel(
+                text = label,
+                container = if (spicy) colors.errorContainer else colors.tertiaryContainer,
+                content = if (spicy) colors.onErrorContainer else colors.onTertiaryContainer
+            )
+        }
     }
 }
+
+fun MenuItem.displayPrice(): String =
+    if (this is Pizza) "от ${(price * PizzaSize.SMALL.priceFactor).formatPrice()}" else price.formatPrice()
 
 @Composable
 fun MenuItemCard(
     item: MenuItem,
     quantity: Int,
+    isFavorite: Boolean,
+    onOpen: () -> Unit,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
+    onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     Card(
-        onClick = { expanded = !expanded },
+        onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .animateContentSize(),
+            modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             MenuItemImage(item)
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
                 Text(item.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                if (item is Pizza && item.isVegetarian) {
-                    VegetarianLabel(Modifier.padding(vertical = 2.dp))
-                }
+                ItemLabels(item, Modifier.padding(vertical = 2.dp))
                 Text(
                     text = item.details(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (expanded) Int.MAX_VALUE else 1,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = item.price.formatPrice(),
+                    text = item.displayPrice(),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            if (quantity == 0) {
-                Button(onClick = onAdd) { Text("В корзину") }
-            } else {
-                QuantityStepper(quantity = quantity, onAdd = onAdd, onRemove = onRemove)
+            Column(horizontalAlignment = Alignment.End) {
+                FavoriteButton(isFavorite = isFavorite, onToggle = onToggleFavorite)
+                if (quantity == 0) {
+                    FilledIconButton(onClick = onAdd, modifier = Modifier.padding(end = 8.dp)) {
+                        Icon(painterResource(R.drawable.ic_add), contentDescription = "В корзину")
+                    }
+                } else {
+                    QuantityStepper(
+                        quantity = quantity,
+                        onAdd = onAdd,
+                        onRemove = onRemove,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-fun CartBar(
-    count: Int,
-    total: Double,
-    onCheckout: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("В корзине: $count шт.", style = MaterialTheme.typography.labelLarge)
-                Text(total.formatPrice(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            }
-            Button(onClick = onCheckout) { Text("Оформить") }
         }
     }
 }
@@ -258,8 +233,8 @@ fun CartBar(
 private fun MenuItemCardPreview() {
     PizzeriaTheme {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            MenuItemCard(SampleData.menu[0], quantity = 0, onAdd = {}, onRemove = {})
-            MenuItemCard(SampleData.menu[6], quantity = 2, onAdd = {}, onRemove = {})
+            MenuItemCard(SampleData.menu[0], 0, true, {}, {}, {}, {})
+            MenuItemCard(SampleData.menu[1], 2, false, {}, {}, {}, {})
         }
     }
 }
