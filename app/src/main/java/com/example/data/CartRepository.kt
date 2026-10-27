@@ -1,21 +1,12 @@
 package com.example.data
 
+import com.example.model.Cart
 import com.example.model.OrderLine
 import com.example.model.PromoCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-
-data class Cart(
-    val lines: List<OrderLine> = emptyList(),
-    val promo: PromoCode? = null
-) {
-    val count: Int
-        get() = lines.sumOf { it.quantity }
-
-    fun quantityOf(itemId: Int): Int = lines.filter { it.item.id == itemId }.sumOf { it.quantity }
-}
 
 class CartRepository {
 
