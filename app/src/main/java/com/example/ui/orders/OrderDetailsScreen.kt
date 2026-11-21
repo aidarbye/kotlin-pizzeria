@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
@@ -15,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,7 +31,9 @@ import com.example.model.OrderStatus
 import com.example.model.progress
 import com.example.model.toText
 import com.example.ui.AppViewModelProvider
+import com.example.ui.components.ConfirmDialog
 import com.example.ui.components.EmptyState
+import com.example.ui.components.LoadingState
 import com.example.ui.components.OrderLineRow
 import com.example.ui.components.PizzeriaTopBar
 import com.example.ui.components.PriceBreakdown
@@ -48,16 +48,14 @@ fun OrderDetailsScreen(
     onRepeated: () -> Unit,
     viewModel: OrderDetailsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-    val order by viewModel.order.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     OrderDetailsContent(
         orderId = viewModel.orderId,
-        order = order,
+        order = state.order,
+        isLoading = state.isLoading,
         onBack = onBack,
         onCancel = viewModel::cancel,
-        onRepeat = {
-            viewModel.repeat()
-            onRepeated()
-        }
+        onRepeat = { viewModel.repeat(onRepeated = onRepeated) }
     )
 }
 
@@ -65,6 +63,7 @@ fun OrderDetailsScreen(
 fun OrderDetailsContent(
     orderId: Int,
     order: Order?,
+    isLoading: Boolean,
     onBack: () -> Unit,
     onCancel: () -> Unit,
     onRepeat: () -> Unit
@@ -72,11 +71,15 @@ fun OrderDetailsContent(
     var confirmCancel by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(topBar = { PizzeriaTopBar(title = "Заказ #$orderId", onBack = onBack) }) { padding ->
+        if (isLoading) {
+            LoadingState(Modifier.padding(padding))
+            return@Scaffold
+        }
         if (order == null) {
             EmptyState(
                 icon = R.drawable.ic_orders,
                 title = "Заказ не найден",
-                subtitle = "Похоже, приложение было перезапущено",
+                subtitle = "Такого заказа нет в истории",
                 modifier = Modifier.padding(padding)
             )
             return@Scaffold
@@ -152,19 +155,16 @@ fun OrderDetailsContent(
     }
 
     if (confirmCancel && order?.canCancel == true) {
-        AlertDialog(
-            onDismissRequest = { confirmCancel = false },
-            title = { Text("Отменить заказ #$orderId?") },
-            text = { Text("Отменить можно, пока заказ не передан курьеру.") },
-            confirmButton = {
-                Button(onClick = {
-                    onCancel()
-                    confirmCancel = false
-                }) { Text("Отменить заказ") }
+        ConfirmDialog(
+            title = "Отменить заказ #$orderId?",
+            text = "Отменить можно, пока заказ не передан курьеру. Ингредиенты вернутся на склад.",
+            confirmText = "Отменить заказ",
+            dismissText = "Нет",
+            onConfirm = {
+                confirmCancel = false
+                onCancel()
             },
-            dismissButton = {
-                TextButton(onClick = { confirmCancel = false }) { Text("Нет") }
-            }
+            onDismiss = { confirmCancel = false }
         )
     }
 }

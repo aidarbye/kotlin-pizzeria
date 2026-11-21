@@ -181,7 +181,8 @@ fun QuantityStepper(
     quantity: Int,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    canAdd: Boolean = true
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         FilledTonalIconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
@@ -192,7 +193,7 @@ fun QuantityStepper(
             modifier = Modifier.padding(horizontal = 12.dp),
             style = MaterialTheme.typography.titleMedium
         )
-        FilledTonalIconButton(onClick = onAdd, modifier = Modifier.size(36.dp)) {
+        FilledTonalIconButton(onClick = onAdd, enabled = canAdd, modifier = Modifier.size(36.dp)) {
             Icon(painterResource(R.drawable.ic_add), contentDescription = "Добавить")
         }
     }

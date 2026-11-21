@@ -170,10 +170,24 @@ fun ItemLabels(item: MenuItem, modifier: Modifier = Modifier) {
 fun MenuItem.displayPrice(): String =
     if (this is Pizza) "от ${(price * PizzaSize.SMALL.priceFactor).formatPrice()}" else price.formatPrice()
 
+/** "Нет в наличии" or "Осталось N" when the stock allows only a few portions. */
+@Composable
+fun AvailabilityLabel(portionsLeft: Int?, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    when {
+        portionsLeft == null -> Unit
+        portionsLeft == 0 -> InfoLabel("Нет в наличии", colors.errorContainer, colors.onErrorContainer, modifier)
+        portionsLeft <= LOW_PORTIONS -> InfoLabel("Осталось $portionsLeft", colors.secondaryContainer, colors.onSecondaryContainer, modifier)
+    }
+}
+
+private const val LOW_PORTIONS = 5
+
 @Composable
 fun MenuItemCard(
     item: MenuItem,
     quantity: Int,
+    portionsLeft: Int?,
     isFavorite: Boolean,
     onOpen: () -> Unit,
     onAdd: () -> Unit,
@@ -195,6 +209,7 @@ fun MenuItemCard(
             Column(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
                 Text(item.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 ItemLabels(item, Modifier.padding(vertical = 2.dp))
+                AvailabilityLabel(portionsLeft, Modifier.padding(vertical = 2.dp))
                 Text(
                     text = item.details(),
                     style = MaterialTheme.typography.bodySmall,
@@ -212,7 +227,7 @@ fun MenuItemCard(
             Column(horizontalAlignment = Alignment.End) {
                 FavoriteButton(isFavorite = isFavorite, onToggle = onToggleFavorite)
                 if (quantity == 0) {
-                    FilledIconButton(onClick = onAdd, modifier = Modifier.padding(end = 8.dp)) {
+                    FilledIconButton(onClick = onAdd, enabled = portionsLeft != 0, modifier = Modifier.padding(end = 8.dp)) {
                         Icon(painterResource(R.drawable.ic_add), contentDescription = "В корзину")
                     }
                 } else {
@@ -220,6 +235,7 @@ fun MenuItemCard(
                         quantity = quantity,
                         onAdd = onAdd,
                         onRemove = onRemove,
+                        canAdd = portionsLeft != 0,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
@@ -233,8 +249,9 @@ fun MenuItemCard(
 private fun MenuItemCardPreview() {
     PizzeriaTheme {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            MenuItemCard(SampleData.menu[0], 0, true, {}, {}, {}, {})
-            MenuItemCard(SampleData.menu[1], 2, false, {}, {}, {}, {})
+            MenuItemCard(SampleData.menu[0], 0, null, true, {}, {}, {}, {})
+            MenuItemCard(SampleData.menu[1], 2, 3, false, {}, {}, {}, {})
+            MenuItemCard(SampleData.menu[12], 0, 0, false, {}, {}, {}, {})
         }
     }
 }

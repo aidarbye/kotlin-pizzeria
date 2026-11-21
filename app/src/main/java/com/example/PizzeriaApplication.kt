@@ -4,5 +4,5 @@ import android.app.Application
 import com.example.data.AppContainer
 
 class PizzeriaApplication : Application() {
-    val container: AppContainer by lazy { AppContainer() }
+    val container: AppContainer by lazy { AppContainer(this) }
 }

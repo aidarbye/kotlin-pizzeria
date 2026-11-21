@@ -1,46 +1,62 @@
 package com.example.data
 
+import com.example.data.local.CartDao
+import com.example.data.local.CartLineEntity
+import com.example.data.local.MenuDao
+import com.example.data.local.MenuItemEntity
+import com.example.data.local.toCartEntity
+import com.example.data.local.toModel
 import com.example.model.Cart
+import com.example.model.Extra
 import com.example.model.OrderLine
 import com.example.model.PromoCode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
 
-class CartRepository {
+/** Cart lines are stored in Room, so the cart survives a restart. The applied promo code lives in memory. */
+class CartRepository(
+    private val cartDao: CartDao,
+    private val menuDao: MenuDao,
+    private val extras: List<Extra>,
+    private val externalScope: CoroutineScope
+) {
+    private val promo = MutableStateFlow<PromoCode?>(null)
 
-    private val _cart = MutableStateFlow(Cart())
-    val cart: StateFlow<Cart> = _cart.asStateFlow()
+    val cart: Flow<Cart> = combine(cartDao.observeLines(), menuDao.observeAll(), promo, ::buildCart)
 
-    fun add(line: OrderLine) = _cart.update { cart ->
-        val existing = cart.lines.find { it.key == line.key }
-        val lines = if (existing == null) {
-            cart.lines + line
-        } else {
-            cart.lines.map { if (it.key == line.key) it.copy(quantity = it.quantity + line.quantity) else it }
-        }
-        cart.copy(lines = lines)
+    suspend fun currentCart(): Cart = buildCart(cartDao.getLines(), menuDao.getAll(), promo.value)
+
+    suspend fun add(line: OrderLine) = externalScope.runDetached { cartDao.addOrIncrease(line.toCartEntity()) }
+
+    suspend fun addAll(lines: List<OrderLine>) = externalScope.runDetached {
+        lines.forEach { cartDao.addOrIncrease(it.toCartEntity()) }
     }
 
-    fun addAll(lines: List<OrderLine>) = lines.forEach(::add)
+    suspend fun changeQuantity(key: String, delta: Int) = externalScope.runDetached { cartDao.changeQuantity(key, delta) }
 
-    fun changeQuantity(key: String, delta: Int) = _cart.update { cart ->
-        cart.copy(
-            lines = cart.lines
-                .map { if (it.key == key) it.copy(quantity = it.quantity + delta) else it }
-                .filter { it.quantity > 0 }
+    suspend fun removeOneOf(itemId: Int) = externalScope.runDetached {
+        cartDao.getLastLineOf(itemId)?.let { cartDao.changeQuantity(it.key, -1) }
+    }
+
+    suspend fun remove(key: String) = externalScope.runDetached { cartDao.delete(key) }
+
+    fun applyPromo(code: PromoCode?) {
+        promo.value = code
+    }
+
+    /** Called by [OrderRepository] inside the transaction that places an order. */
+    suspend fun clear() {
+        cartDao.clear()
+        promo.value = null
+    }
+
+    private fun buildCart(lines: List<CartLineEntity>, items: List<MenuItemEntity>, promo: PromoCode?): Cart {
+        val byId = items.associateBy { it.id }
+        return Cart(
+            lines = lines.mapNotNull { line -> byId[line.menuItemId]?.let { line.toModel(it.toModel(), extras) } },
+            promo = promo
         )
     }
-
-    fun removeOneOf(itemId: Int) {
-        val line = _cart.value.lines.lastOrNull { it.item.id == itemId } ?: return
-        changeQuantity(line.key, -1)
-    }
-
-    fun remove(key: String) = _cart.update { cart -> cart.copy(lines = cart.lines.filterNot { it.key == key }) }
-
-    fun applyPromo(promo: PromoCode?) = _cart.update { it.copy(promo = promo) }
-
-    fun clear() = _cart.update { Cart() }
 }

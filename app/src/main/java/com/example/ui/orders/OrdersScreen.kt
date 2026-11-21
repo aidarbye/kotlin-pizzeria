@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.ui.AppViewModelProvider
 import com.example.ui.components.EmptyState
+import com.example.ui.components.LoadingState
 import com.example.ui.components.OrderCard
 import com.example.ui.components.PizzeriaTopBar
 import com.example.ui.components.SectionTitle
@@ -37,6 +38,10 @@ fun OrdersContent(
     onOpenMenu: () -> Unit
 ) {
     Scaffold(topBar = { PizzeriaTopBar(title = "Мои заказы") }) { padding ->
+        if (state.isLoading) {
+            LoadingState(Modifier.padding(padding))
+            return@Scaffold
+        }
         if (state.isEmpty) {
             EmptyState(
                 icon = R.drawable.ic_orders,

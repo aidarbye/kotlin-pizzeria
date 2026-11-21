@@ -21,11 +21,13 @@ import com.example.service.Pizzeria
 import com.example.ui.AppViewModelProvider
 import com.example.ui.components.CartLineCard
 import com.example.ui.components.EmptyState
+import com.example.ui.components.LoadingState
 import com.example.ui.components.PizzeriaTopBar
 import com.example.ui.components.PriceBreakdown
 import com.example.ui.components.PromoCodeField
 import com.example.ui.components.SectionTitle
 import com.example.ui.components.SummaryBar
+import com.example.ui.components.WarningCard
 
 @Composable
 fun CartScreen(
@@ -62,14 +64,19 @@ fun CartContent(
         bottomBar = {
             if (state.lines.isNotEmpty()) {
                 SummaryBar(
-                    label = "${state.count} шт.",
+                    label = if (state.shortages.isEmpty()) "${state.count} шт." else "Не хватает ингредиентов",
                     total = state.quote.subtotal - state.quote.discount,
                     actionText = "Оформить",
-                    onAction = onCheckout
+                    onAction = onCheckout,
+                    enabled = state.shortages.isEmpty()
                 )
             }
         }
     ) { padding ->
+        if (state.isLoading) {
+            LoadingState(Modifier.padding(padding))
+            return@Scaffold
+        }
         if (state.lines.isEmpty()) {
             EmptyState(
                 icon = R.drawable.ic_cart,
@@ -87,6 +94,14 @@ fun CartContent(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (state.shortages.isNotEmpty()) {
+                item(key = "shortages") {
+                    WarningCard(
+                        title = "На складе не хватает ингредиентов. Уменьшите количество:",
+                        lines = state.shortages.map { it.describe() }
+                    )
+                }
+            }
             items(state.lines, key = { it.key }) { line ->
                 CartLineCard(
                     line = line,

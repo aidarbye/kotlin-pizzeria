@@ -3,10 +3,14 @@ package com.example.data
 import com.example.model.Dessert
 import com.example.model.Drink
 import com.example.model.Extra
+import com.example.model.Ingredient
 import com.example.model.MenuItem
 import com.example.model.Pizza
 import com.example.model.PromoCode
+import com.example.model.RecipeEntry
+import com.example.model.StockUnit
 
+/** Data the database is filled with on the first launch, and static data that is not edited by the user. */
 object SampleData {
     val menu: List<MenuItem> = listOf(
         Pizza(1, "Margherita", 8.5, "Классика из Неаполя: томатный соус, моцарелла и свежий базилик.", setOf("томаты", "моцарелла", "базилик"), isVegetarian = true),
@@ -37,4 +41,52 @@ object SampleData {
         PromoCode("ROMA5", "Минус \$5 при заказе от \$25", { subtotal -> if (subtotal >= 25.0) 5.0 else 0.0 }),
         PromoCode("FREESHIP", "Бесплатная доставка", { 0.0 }, freeDelivery = true)
     )
+
+    val ingredients: List<Ingredient> = listOf(
+        Ingredient(1, "Тесто", StockUnit.GRAM, 5000.0, 1000.0),
+        Ingredient(2, "Томатный соус", StockUnit.MILLILITER, 3000.0, 500.0),
+        Ingredient(3, "Моцарелла", StockUnit.GRAM, 4000.0, 800.0),
+        Ingredient(4, "Базилик", StockUnit.GRAM, 200.0, 50.0),
+        Ingredient(5, "Пепперони", StockUnit.GRAM, 1200.0, 300.0),
+        Ingredient(6, "Горгонзола", StockUnit.GRAM, 600.0, 150.0),
+        Ingredient(7, "Пармезан", StockUnit.GRAM, 600.0, 150.0),
+        Ingredient(8, "Чеддер", StockUnit.GRAM, 600.0, 150.0),
+        Ingredient(9, "Курица", StockUnit.GRAM, 1500.0, 300.0),
+        Ingredient(10, "Соус барбекю", StockUnit.MILLILITER, 800.0, 200.0),
+        Ingredient(11, "Красный лук", StockUnit.GRAM, 1000.0, 200.0),
+        Ingredient(12, "Сладкий перец", StockUnit.GRAM, 800.0, 200.0),
+        Ingredient(13, "Шампиньоны", StockUnit.GRAM, 800.0, 200.0),
+        Ingredient(14, "Оливки", StockUnit.GRAM, 500.0, 100.0),
+        Ingredient(15, "Ветчина", StockUnit.GRAM, 1200.0, 300.0),
+        Ingredient(16, "Ананас", StockUnit.GRAM, 600.0, 150.0),
+        Ingredient(17, "Салями", StockUnit.GRAM, 400.0, 300.0),
+        Ingredient(18, "Халапеньо", StockUnit.GRAM, 300.0, 80.0),
+        Ingredient(19, "Томаты", StockUnit.GRAM, 2000.0, 400.0),
+        Ingredient(20, "Cola 0.5 л", StockUnit.PIECE, 24.0, 6.0),
+        Ingredient(21, "Апельсины", StockUnit.PIECE, 30.0, 10.0),
+        Ingredient(22, "Лимоны", StockUnit.PIECE, 6.0, 5.0),
+        Ingredient(23, "Маскарпоне", StockUnit.GRAM, 1000.0, 250.0),
+        Ingredient(24, "Савоярди", StockUnit.PIECE, 40.0, 10.0),
+        Ingredient(25, "Сливочный сыр", StockUnit.GRAM, 1500.0, 300.0),
+        Ingredient(26, "Сезонные фрукты", StockUnit.GRAM, 0.0, 500.0)
+    )
+
+    /** menuItemId to (ingredientId to amount per portion). */
+    val recipes: List<RecipeEntry> = mapOf(
+        1 to listOf(1 to 250.0, 2 to 80.0, 3 to 120.0, 19 to 60.0, 4 to 5.0),
+        2 to listOf(1 to 250.0, 2 to 80.0, 3 to 130.0, 5 to 90.0),
+        3 to listOf(1 to 250.0, 3 to 80.0, 6 to 50.0, 7 to 40.0, 8 to 50.0),
+        4 to listOf(1 to 250.0, 3 to 110.0, 9 to 120.0, 11 to 40.0, 10 to 60.0),
+        5 to listOf(1 to 250.0, 2 to 80.0, 3 to 100.0, 12 to 60.0, 13 to 60.0, 19 to 60.0, 14 to 30.0),
+        6 to listOf(1 to 250.0, 2 to 80.0, 3 to 110.0, 15 to 100.0, 16 to 70.0),
+        7 to listOf(1 to 250.0, 2 to 80.0, 3 to 110.0, 17 to 90.0, 18 to 30.0),
+        8 to listOf(20 to 1.0),
+        9 to listOf(21 to 3.0),
+        10 to listOf(22 to 2.0),
+        11 to listOf(23 to 100.0, 24 to 4.0),
+        12 to listOf(25 to 120.0),
+        13 to listOf(26 to 200.0)
+    ).flatMap { (menuItemId, entries) ->
+        entries.map { (ingredientId, amount) -> RecipeEntry(menuItemId, ingredientId, amount) }
+    }
 }

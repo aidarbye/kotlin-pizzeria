@@ -9,11 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,12 +26,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.model.DeliveryType
 import com.example.ui.AppViewModelProvider
+import com.example.ui.components.ChoiceRow
 import com.example.ui.components.EmptyState
+import com.example.ui.components.FormTextField
+import com.example.ui.components.LoadingState
 import com.example.ui.components.OrderLineRow
 import com.example.ui.components.PizzeriaTopBar
 import com.example.ui.components.PriceBreakdown
 import com.example.ui.components.SectionTitle
 import com.example.ui.components.SummaryBar
+import com.example.ui.components.WarningCard
 
 @Composable
 fun CheckoutScreen(
@@ -48,7 +48,7 @@ fun CheckoutScreen(
         state = state,
         onBack = onBack,
         onDeliveryTypeChange = viewModel::selectDeliveryType,
-        onPlaceOrder = { form -> viewModel.placeOrder(form)?.let(onOrderPlaced) }
+        onPlaceOrder = { form -> viewModel.placeOrder(form, onPlaced = onOrderPlaced) }
     )
 }
 
@@ -73,17 +73,22 @@ fun CheckoutContent(
         bottomBar = {
             if (state.lines.isNotEmpty()) {
                 SummaryBar(
-                    label = "К оплате",
+                    label = if (state.isPlacing) "Оформляем..." else "К оплате",
                     total = state.quote.total,
                     actionText = "Заказать",
                     onAction = {
                         submitted = true
                         onPlaceOrder(form)
-                    }
+                    },
+                    enabled = !state.isPlacing && state.shortages.isEmpty()
                 )
             }
         }
     ) { padding ->
+        if (state.isLoading) {
+            LoadingState(Modifier.padding(padding))
+            return@Scaffold
+        }
         if (state.lines.isEmpty()) {
             EmptyState(
                 icon = R.drawable.ic_cart,
@@ -103,26 +108,28 @@ fun CheckoutContent(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                DeliveryType.entries.forEachIndexed { index, type ->
-                    SegmentedButton(
-                        selected = state.deliveryType == type,
-                        onClick = { onDeliveryTypeChange(type) },
-                        shape = SegmentedButtonDefaults.itemShape(index, DeliveryType.entries.size),
-                        label = { Text(type.title) }
-                    )
-                }
+            if (state.shortages.isNotEmpty()) {
+                WarningCard(
+                    title = "Пока вы оформляли заказ, ингредиенты закончились:",
+                    lines = state.shortages.map { it.describe() }
+                )
             }
+            ChoiceRow(
+                options = DeliveryType.entries,
+                selected = state.deliveryType,
+                label = { it.title },
+                onSelect = onDeliveryTypeChange
+            )
 
             SectionTitle("Контакты")
-            FormField(
+            FormTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = "Имя",
                 error = errors.name,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
             )
-            FormField(
+            FormTextField(
                 value = phone,
                 onValueChange = { phone = it },
                 label = "Телефон",
@@ -130,7 +137,7 @@ fun CheckoutContent(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
             )
             if (state.deliveryType == DeliveryType.DELIVERY) {
-                FormField(
+                FormTextField(
                     value = address,
                     onValueChange = { address = it },
                     label = "Адрес доставки",
@@ -144,7 +151,7 @@ fun CheckoutContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            FormField(
+            FormTextField(
                 value = comment,
                 onValueChange = { comment = it },
                 label = "Комментарий к заказу",
@@ -163,26 +170,4 @@ fun CheckoutContent(
             }
         }
     }
-}
-
-@Composable
-private fun FormField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    error: String? = null,
-    singleLine: Boolean = true,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(label) },
-        isError = error != null,
-        supportingText = error?.let { { Text(it) } },
-        singleLine = singleLine,
-        minLines = if (singleLine) 1 else 2,
-        keyboardOptions = keyboardOptions
-    )
 }

@@ -14,7 +14,8 @@ data class OrdersUiState(
     val active: List<Order> = emptyList(),
     val history: List<Order> = emptyList(),
     val revenue: Double = 0.0,
-    val popularity: List<Pair<String, Int>> = emptyList()
+    val popularity: List<Pair<String, Int>> = emptyList(),
+    val isLoading: Boolean = true
 ) {
     val isEmpty: Boolean
         get() = active.isEmpty() && history.isEmpty()
@@ -32,7 +33,8 @@ class OrdersViewModel(
                 active = active,
                 history = history,
                 revenue = pizzeria.totalRevenue(orders),
-                popularity = pizzeria.popularity(orders).toList().sortedByDescending { it.second }.take(3)
+                popularity = pizzeria.popularity(orders).toList().sortedByDescending { it.second }.take(3),
+                isLoading = false
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OrdersUiState())

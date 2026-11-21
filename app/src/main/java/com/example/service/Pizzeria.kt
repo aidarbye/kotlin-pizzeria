@@ -16,20 +16,20 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class Pizzeria(
     val name: String,
-    val menu: List<MenuItem>,
     private val promoCodes: List<PromoCode>,
     private val timeScale: Long = 3L
 ) {
-    fun filterMenu(predicate: (MenuItem) -> Boolean): List<MenuItem> = menu.filter(predicate)
+    fun filterMenu(menu: List<MenuItem>, predicate: (MenuItem) -> Boolean): List<MenuItem> = menu.filter(predicate)
 
     fun search(
+        menu: List<MenuItem>,
         query: String,
         category: Category,
         vegetarianOnly: Boolean,
         favoriteIds: Set<Int>? = null
     ): List<MenuItem> {
         val text = query.trim()
-        return filterMenu { item ->
+        return filterMenu(menu) { item ->
             category.matches(item) &&
                 (!vegetarianOnly || item.isVegetarian) &&
                 (favoriteIds == null || item.id in favoriteIds) &&
@@ -38,8 +38,6 @@ class Pizzeria(
                     (item is Pizza && item.toppings.any { it.contains(text, ignoreCase = true) }))
         }
     }
-
-    fun findItem(id: Int): MenuItem? = menu.find { it.id == id }
 
     fun findPromo(code: String): PromoCode? = promoCodes.find { it.code.equals(code.trim(), ignoreCase = true) }
 
@@ -65,25 +63,38 @@ class Pizzeria(
             .groupBy { it.item.name }
             .mapValues { (_, lines) -> lines.sumOf { it.quantity } }
 
-    suspend fun processOrder(order: Order, onStatus: (OrderStatus) -> Unit) {
+    /**
+     * Moves the order through its statuses. Starts from the status the order already has, so an order
+     * restored from the database after a restart continues where it stopped instead of starting over.
+     */
+    suspend fun processOrder(order: Order, onStatus: suspend (OrderStatus) -> Unit) {
         if (order.lines.isEmpty()) {
             onStatus(OrderStatus.Cancelled("пустой заказ"))
             return
         }
+        val start = order.status
+        if (!order.isActive) return
 
-        onStatus(OrderStatus.Received)
-        delay((500 * timeScale).milliseconds)
+        if (start is OrderStatus.Received) {
+            onStatus(OrderStatus.Received)
+            delay((500 * timeScale).milliseconds)
+        }
 
+        val cookedPercent = when (start) {
+            is OrderStatus.Cooking -> start.progress
+            OrderStatus.Delivering -> 100
+            else -> 0
+        }
         val cookTime = order.lines.sumOf { line ->
             (line.item as? Preparable)?.prepareTimeMs()?.times(line.quantity) ?: 0L
         }.coerceIn(1000L, 4000L) * timeScale
-        for (progress in 10..100 step 10) {
+        for (progress in (cookedPercent + 10)..100 step 10) {
             delay((cookTime / 10).milliseconds)
             onStatus(OrderStatus.Cooking(progress))
         }
 
         if (order.deliveryType == DeliveryType.DELIVERY) {
-            onStatus(OrderStatus.Delivering)
+            if (start != OrderStatus.Delivering) onStatus(OrderStatus.Delivering)
             delay((1500 * timeScale).milliseconds)
         }
         onStatus(OrderStatus.Delivered(minutes = 15 + order.lines.size * 5))

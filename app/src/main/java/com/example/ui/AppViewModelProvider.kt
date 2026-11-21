@@ -10,23 +10,57 @@ import com.example.data.AppContainer
 import com.example.ui.cart.CartViewModel
 import com.example.ui.checkout.CheckoutViewModel
 import com.example.ui.details.ItemDetailsViewModel
+import com.example.ui.editor.MenuItemEditViewModel
+import com.example.ui.inventory.IngredientDetailsViewModel
+import com.example.ui.inventory.IngredientEditViewModel
+import com.example.ui.inventory.InventoryViewModel
 import com.example.ui.menu.MenuViewModel
 import com.example.ui.orders.OrderDetailsViewModel
 import com.example.ui.orders.OrdersViewModel
 
 object AppViewModelProvider {
     val Factory = viewModelFactory {
-        initializer { MainViewModel(container().cartRepository, container().orderRepository) }
-        initializer { MenuViewModel(container().menuRepository, container().cartRepository) }
         initializer {
-            ItemDetailsViewModel(createSavedStateHandle(), container().menuRepository, container().cartRepository)
+            val c = container()
+            MainViewModel(c.cartRepository, c.orderRepository, c.inventoryRepository, c.messages)
         }
-        initializer { CartViewModel(container().cartRepository, container().pizzeria) }
         initializer {
-            CheckoutViewModel(createSavedStateHandle(), container().cartRepository, container().orderRepository, container().pizzeria)
+            val c = container()
+            MenuViewModel(c.menuRepository, c.inventoryRepository, c.cartRepository, c.pizzeria, c.messages)
+        }
+        initializer {
+            val c = container()
+            ItemDetailsViewModel(createSavedStateHandle(), c.menuRepository, c.inventoryRepository, c.cartRepository, c.messages)
+        }
+        initializer {
+            val c = container()
+            MenuItemEditViewModel(createSavedStateHandle(), c.menuRepository, c.inventoryRepository, c.messages)
+        }
+        initializer {
+            val c = container()
+            CartViewModel(c.cartRepository, c.menuRepository, c.inventoryRepository, c.pizzeria)
+        }
+        initializer {
+            val c = container()
+            CheckoutViewModel(
+                createSavedStateHandle(),
+                c.cartRepository,
+                c.menuRepository,
+                c.inventoryRepository,
+                c.orderRepository,
+                c.pizzeria,
+                c.messages
+            )
         }
         initializer { OrdersViewModel(container().orderRepository, container().pizzeria) }
-        initializer { OrderDetailsViewModel(createSavedStateHandle(), container().orderRepository) }
+        initializer { OrderDetailsViewModel(createSavedStateHandle(), container().orderRepository, container().messages) }
+        initializer { InventoryViewModel(container().inventoryRepository, container().menuRepository) }
+        initializer {
+            IngredientDetailsViewModel(createSavedStateHandle(), container().inventoryRepository, container().messages)
+        }
+        initializer {
+            IngredientEditViewModel(createSavedStateHandle(), container().inventoryRepository, container().messages)
+        }
     }
 }
 
