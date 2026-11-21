@@ -24,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +34,7 @@ import com.example.R
 import com.example.model.DishUsage
 import com.example.model.Ingredient
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.ConfirmDialog
 import com.example.ui.components.EmptyState
 import com.example.ui.components.LoadingState
@@ -76,6 +78,7 @@ fun IngredientDetailsContent(
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost() },
         topBar = {
             PizzeriaTopBar(title = ingredient?.name ?: "Ингредиент", onBack = onBack) {
                 if (ingredient != null) {
@@ -211,7 +214,11 @@ private fun TotalsCard(ingredient: Ingredient, totals: StockTotals) {
             PriceRow("Поступило", ingredient.format(totals.received))
             PriceRow("Ушло в заказы", ingredient.format(totals.usedInOrders))
             if (totals.returned > 0) PriceRow("Вернулось после отмен", ingredient.format(totals.returned))
-            PriceRow("Списано", ingredient.format(totals.writtenOff), color = MaterialTheme.colorScheme.error)
+            PriceRow(
+                "Списано",
+                ingredient.format(totals.writtenOff),
+                color = if (totals.writtenOff > 0) MaterialTheme.colorScheme.error else Color.Unspecified
+            )
         }
     }
 }

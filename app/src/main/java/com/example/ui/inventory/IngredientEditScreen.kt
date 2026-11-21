@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.model.StockUnit
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.ChoiceRow
 import com.example.ui.components.EmptyState
 import com.example.ui.components.FormTextField
@@ -57,6 +58,7 @@ fun IngredientEditContent(
     val form = state.form
     val errors = state.errors
     Scaffold(
+        snackbarHost = { AppSnackbarHost() },
         topBar = { PizzeriaTopBar(title = if (state.isNew) "Новый ингредиент" else "Редактирование", onBack = onBack) },
         bottomBar = {
             if (!state.isLoading && !state.notFound) {

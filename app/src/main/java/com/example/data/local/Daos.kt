@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MenuDao {
-    @Query("SELECT * FROM menu_items ORDER BY type, name")
+    @Query("SELECT * FROM menu_items ORDER BY CASE type WHEN 'PIZZA' THEN 0 WHEN 'DRINK' THEN 1 ELSE 2 END, id")
     fun observeAll(): Flow<List<MenuItemEntity>>
 
     @Query("SELECT * FROM menu_items WHERE id = :id")

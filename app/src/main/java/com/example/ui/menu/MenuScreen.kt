@@ -32,6 +32,7 @@ import com.example.data.SampleData
 import com.example.model.Category
 import com.example.model.MenuItem
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.LocalSnackbarHostState
 import com.example.ui.components.CategoryFilterRow
 import com.example.ui.components.EmptyState
 import com.example.ui.components.LoadingState
@@ -52,7 +53,7 @@ fun MenuScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
 
     MenuContent(
@@ -105,7 +106,7 @@ fun MenuContent(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddItem,
-                icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = "Добавить блюдо") },
                 text = { Text("Блюдо") }
             )
         },

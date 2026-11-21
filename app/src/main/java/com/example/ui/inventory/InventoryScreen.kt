@@ -28,6 +28,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.data.SampleData
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.EmptyState
 import com.example.ui.components.IngredientCard
 import com.example.ui.components.LoadingState
@@ -55,11 +56,12 @@ fun InventoryContent(
     onAddIngredient: () -> Unit
 ) {
     Scaffold(
+        snackbarHost = { AppSnackbarHost() },
         topBar = { PizzeriaTopBar(title = "Склад") },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddIngredient,
-                icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = "Добавить ингредиент") },
                 text = { Text("Ингредиент") }
             )
         }

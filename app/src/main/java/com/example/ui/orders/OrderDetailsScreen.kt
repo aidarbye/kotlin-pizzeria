@@ -31,6 +31,7 @@ import com.example.model.OrderStatus
 import com.example.model.progress
 import com.example.model.toText
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.ConfirmDialog
 import com.example.ui.components.EmptyState
 import com.example.ui.components.LoadingState
@@ -70,7 +71,7 @@ fun OrderDetailsContent(
 ) {
     var confirmCancel by rememberSaveable { mutableStateOf(false) }
 
-    Scaffold(topBar = { PizzeriaTopBar(title = "Заказ #$orderId", onBack = onBack) }) { padding ->
+    Scaffold(snackbarHost = { AppSnackbarHost() }, topBar = { PizzeriaTopBar(title = "Заказ #$orderId", onBack = onBack) }) { padding ->
         if (isLoading) {
             LoadingState(Modifier.padding(padding))
             return@Scaffold

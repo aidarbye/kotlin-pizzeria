@@ -60,7 +60,7 @@ fun StockLevelBar(ingredient: Ingredient, modifier: Modifier = Modifier) {
     val full = (ingredient.lowThreshold * 2).takeIf { it > 0 } ?: ingredient.stock.coerceAtLeast(1.0)
     val color = when {
         ingredient.isOut || ingredient.isLow -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.tertiary
     }
     LinearProgressIndicator(
         progress = { (ingredient.stock / full).toFloat().coerceIn(0f, 1f) },
@@ -98,7 +98,7 @@ fun IngredientCard(
                 Text(
                     text = ingredient.format(ingredient.stock),
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (ingredient.isOut || ingredient.isLow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    color = if (ingredient.isOut || ingredient.isLow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.weight(1f)
                 )
                 Text(

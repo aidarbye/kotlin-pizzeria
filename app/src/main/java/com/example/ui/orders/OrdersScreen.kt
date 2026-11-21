@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.EmptyState
 import com.example.ui.components.LoadingState
 import com.example.ui.components.OrderCard
@@ -37,7 +38,7 @@ fun OrdersContent(
     onOpenOrder: (Int) -> Unit,
     onOpenMenu: () -> Unit
 ) {
-    Scaffold(topBar = { PizzeriaTopBar(title = "Мои заказы") }) { padding ->
+    Scaffold(snackbarHost = { AppSnackbarHost() }, topBar = { PizzeriaTopBar(title = "Мои заказы") }) { padding ->
         if (state.isLoading) {
             LoadingState(Modifier.padding(padding))
             return@Scaffold

@@ -19,6 +19,7 @@ import com.example.model.OrderLine
 import com.example.model.formatPrice
 import com.example.service.Pizzeria
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.CartLineCard
 import com.example.ui.components.EmptyState
 import com.example.ui.components.LoadingState
@@ -60,6 +61,7 @@ fun CartContent(
     onOpenMenu: () -> Unit
 ) {
     Scaffold(
+        snackbarHost = { AppSnackbarHost() },
         topBar = { PizzeriaTopBar(title = "Корзина") },
         bottomBar = {
             if (state.lines.isNotEmpty()) {

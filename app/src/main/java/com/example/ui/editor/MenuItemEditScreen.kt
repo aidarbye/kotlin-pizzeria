@@ -42,6 +42,7 @@ import com.example.data.SampleData
 import com.example.model.DishType
 import com.example.model.Ingredient
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.ChoiceRow
 import com.example.ui.components.EmptyState
 import com.example.ui.components.FormTextField
@@ -85,6 +86,7 @@ fun MenuItemEditContent(
     var pickIngredient by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost() },
         topBar = { PizzeriaTopBar(title = if (state.isNew) "Новое блюдо" else "Редактирование", onBack = onBack) },
         bottomBar = {
             if (!state.isLoading && !state.notFound) {

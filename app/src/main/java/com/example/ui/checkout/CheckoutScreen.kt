@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.model.DeliveryType
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.ChoiceRow
 import com.example.ui.components.EmptyState
 import com.example.ui.components.FormTextField
@@ -69,6 +70,7 @@ fun CheckoutContent(
     val errors = if (submitted) form.errors(state.deliveryType) else CheckoutErrors()
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost() },
         topBar = { PizzeriaTopBar(title = "Оформление", onBack = onBack) },
         bottomBar = {
             if (state.lines.isNotEmpty()) {

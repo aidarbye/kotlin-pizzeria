@@ -38,6 +38,7 @@ import com.example.model.Pizza
 import com.example.model.PizzaSize
 import com.example.model.formatPrice
 import com.example.ui.AppViewModelProvider
+import com.example.ui.common.AppSnackbarHost
 import com.example.ui.components.AvailabilityLabel
 import com.example.ui.components.ConfirmDialog
 import com.example.ui.components.EmptyState
@@ -90,6 +91,7 @@ fun ItemDetailsContent(
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost() },
         topBar = {
             PizzeriaTopBar(title = item?.name ?: "Блюдо", onBack = onBack) {
                 if (item != null) {
@@ -144,7 +146,7 @@ fun ItemDetailsContent(
             MenuItemImage(item, size = 140.dp, modifier = Modifier.align(Alignment.CenterHorizontally))
             Text(item.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             ItemLabels(item)
-            Text(item.description, style = MaterialTheme.typography.bodyLarge)
+            if (item.description.isNotBlank()) Text(item.description, style = MaterialTheme.typography.bodyLarge)
             Text(item.details(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             if (item is Pizza) {

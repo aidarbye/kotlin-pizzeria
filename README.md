@@ -1,33 +1,162 @@
-# Pizzeria Roma (Midterm, Part 1)
+# Pizzeria Roma (MVVM + Room)
 
-An Android app for ordering food from a pizzeria, built with Kotlin, Jetpack Compose, Material 3, Navigation Compose and ViewModel + StateFlow. It continues HW1 (the console pizzeria) and HW2 (the first Compose version).
+An Android app for a pizzeria, built with Kotlin, Jetpack Compose, Material 3, Navigation Compose, ViewModel + StateFlow and Room. It continues HW1 (the console pizzeria), HW2 (the first Compose version) and the midterm (multi-screen app with navigation).
 
-The user can find a dish in the menu, customize a pizza (size and extra toppings), collect a cart, apply a promo code, choose delivery or pickup, place an order and watch it go through cooking and delivery in real time. Past orders can be repeated in one tap.
+The customer side works as before: find a dish, customize a pizza, collect a cart, apply a promo code, place an order and watch it being cooked and delivered. This version adds:
 
-## Screenshots
+- **Room database.** Menu, recipes, ingredients, stock history, cart, favorites and orders are stored locally and survive a restart.
+- **Menu management (CRUD).** Dishes can be created, edited and deleted (with confirmation) through a validated form.
+- **Additional feature: ingredient inventory with transactions.** Every dish has a recipe, every order takes its ingredients from the stock, and the app does not let you order what the kitchen cannot cook.
 
-| Menu | Pizza customization | Cart with promo code |
+## Additional feature: inventory with stock transactions
+
+The new **Склад** (Stock) tab tracks every ingredient of the pizzeria. It ties the menu, the cart and the orders together:
+
+1. **Recipes link dishes and ingredients** (many-to-many). In the dish form you add ingredients and the amount per portion. For pizzas the amount is for 30 cm and is scaled for 25 cm (×0.8) and 35 cm (×1.3).
+2. **The menu knows what is left.** The app calculates how many more portions each dish allows, taking into account what is already in the cart. Dishes get an "Осталось N" or "Нет в наличии" label and the "+" button is disabled when the stock is empty. On the details screen you cannot add more than the stock allows ("На складе хватит на 4 шт.").
+3. **Placing an order is one Room transaction:** the stock is checked again, the order is saved, an `ORDER` transaction is written for every ingredient and the stock is reduced, the cart is cleared. If something ran out in the meantime, nothing is saved and the user sees what is missing. The cart and checkout also show a warning card and disable checkout when the cart needs more than the stock has.
+4. **Cancelling an order returns the ingredients:** for each ingredient the order took, a `RETURN` transaction gives it back.
+5. **Restock and write-off.** On an ingredient's screen you can add a delivery (`RESTOCK`) or write off spoiled stock (`WRITE_OFF`, a reason is required and you cannot write off more than you have).
+6. **History and statistics.** Each ingredient shows its full operation history, totals (received, used in orders, returned, written off), and the dishes that use it with "enough for N portions". The stock tab shows counters (positions, running low, out of stock, orders served) and the latest operations, where all transactions of one order are grouped into one entry. A badge on the tab shows how many ingredients need attention.
+7. **Ingredients are CRUD too:** create (with a starting stock), edit name and low-stock threshold, delete with confirmation (the dialog says how many recipes use it).
+
+The stock is never edited directly: it only changes through transactions, so the history always explains the current amount.
+
+### Screenshots of the feature
+
+| Stock tab: counters, grouped history, alerts | Ingredient: stock, totals, dishes, history | Menu after the cart took the last salami |
 |---|---|---|
-| ![Menu](screenshots/menu.png) | ![Details](screenshots/details.png) | ![Cart](screenshots/cart.png) |
+| ![Inventory](screenshots/inventory.png) | ![Ingredient history](screenshots/ingredient_history.png) | ![Out of stock](screenshots/menu_out_of_stock.png) |
 
-| Checkout with validation | Order tracking | Orders and stats |
+| Quantity limited by the stock | Cancelling returns ingredients | Dish recipe in the form |
 |---|---|---|
-| ![Checkout](screenshots/checkout.png) | ![Order details](screenshots/order_details.png) | ![Orders](screenshots/orders.png) |
+| ![Details](screenshots/details.png) | ![Cancel order](screenshots/cancel_order.png) | ![Dish form](screenshots/dish_form.png) |
 
-## Features
+In the first screenshot order #1 (4 × Диабло) took 360 g of salami and other ingredients, then 1000 g of salami were delivered, and order #2 (2 × Cola) was cancelled, so the 2 bottles came back.
 
-1. **Menu with search and filters.** Search by name or topping, category chips (pizza, drinks, desserts), "Vegetarian" and "Favorites" toggles. Labels for vegetarian, spicy and sugar-free dishes. Quick "+" adds a medium pizza and shows a snackbar with a shortcut to the cart.
-2. **Favorites.** The heart on a card or on the details screen adds a dish to favorites; the "Favorites" filter shows only them.
-3. **Pizza customization.** The details screen lets you pick a size (25 / 30 / 35 cm, the price changes), extra toppings (double cheese, bacon, cheese crust, ...) and quantity. The same pizza with different options becomes separate cart lines.
-4. **Cart and promo codes.** Change quantity, delete lines, apply a promo code:
-   - `STUDENT10` 10% off,
-   - `ROMA5` $5 off for orders from $25 (the app explains when the condition is not met),
-   - `FREESHIP` free delivery.
-5. **Checkout.** Delivery or pickup (delivery costs $2.50, free from $30). Name, phone and address are validated, errors appear after the first submit attempt. The final price is broken down into items, discount and delivery.
-6. **Live order tracking.** After ordering, a coroutine moves the order through "Accepted → Cooking → On the way → Delivered" (pickup skips delivery). The details screen shows a step timeline and progress; the order can be cancelled until it is handed to the courier (with a confirmation dialog).
-7. **Order history.** Active and finished orders, total spent and most ordered dishes. "Repeat order" puts the same lines back into the cart.
+## Menu management (CRUD)
 
-Badges on the bottom bar show the number of items in the cart and active orders.
+| Validation | Created dish with its recipe | Delete with confirmation |
+|---|---|---|
+| ![Validation](screenshots/dish_form_validation.png) | ![New dish](screenshots/new_dish.png) | ![Delete](screenshots/delete_dish.png) |
+
+- **Create:** the "Блюдо" button on the menu opens an empty form. After saving, the new dish's details screen opens.
+- **Read:** the menu list (`LazyColumn` with `key = { it.id }`) and the details screen.
+- **Update:** the pencil on the details screen opens the same form filled with the dish. Changes appear on the menu, details, cart and stock screens at once, because they all observe Room flows.
+- **Delete:** the bin on the details screen asks for confirmation. The dish disappears from the menu and the cart (foreign key `CASCADE`); old orders keep a snapshot of the dish, so the history stays correct.
+
+Validation: name 2–40 characters and unique (case-insensitive), price $0.50–$500 (accepts `9.5` and `9,5`), description up to 200 characters, at least one topping for a pizza, 50–3000 ml for a drink, every recipe amount greater than 0. Errors appear after the first save attempt, and a snackbar says "Проверьте поля формы". The dish type cannot be changed after creation.
+
+## Other screens
+
+| Menu | Cart | Checkout |
+|---|---|---|
+| ![Menu](screenshots/menu.png) | ![Cart](screenshots/cart.png) | ![Checkout](screenshots/checkout.png) |
+
+| Order tracking | Orders and stats |
+|---|---|
+| ![Order details](screenshots/order_details.png) | ![Orders](screenshots/orders.png) |
+
+## All features
+
+1. **Menu** with search by name or topping, category chips, "Vegetarian" and "Favorites" filters, stock labels, quick "+" with a snackbar shortcut to the cart.
+2. **Favorites** (stored in Room).
+3. **Pizza customization:** size, extra toppings, quantity, recipe for the selected size.
+4. **Cart** (stored in Room) with promo codes `STUDENT10` (10%), `ROMA5` ($5 off from $25), `FREESHIP` (free delivery) and a stock check.
+5. **Checkout** with delivery or pickup and validated name, phone and address.
+6. **Live order tracking:** "Accepted → Cooking → On the way → Delivered", cancel with confirmation while the order is not with the courier.
+7. **Order history** with total spent and most ordered dishes; "Repeat order" puts the dishes back into the cart (dishes that were deleted from the menu are skipped and reported).
+8. **Menu management** (create, edit, delete dishes and their recipes).
+9. **Inventory** (see above).
+
+Every user action gets feedback: snackbars for saved, deleted, restocked, ordered, cancelled; loading indicators while Room loads data; empty states for an empty menu, cart, order list, stock, recipe and history.
+
+## Architecture
+
+```
+app/src/main/java/com/example/
+ ├─ MainActivity.kt, PizzeriaApplication.kt
+ ├─ model/                       MenuItem / Pizza / Drink / Dessert, Order, OrderStatus,
+ │                               Ingredient, RecipeEntry, StockTransaction, Shortage, DishType
+ ├─ service/
+ │   ├─ Pizzeria.kt              search, price quote, stats, order processing
+ │   └─ StockCalculator.kt       requirements of a cart, shortages, portions left
+ ├─ data/
+ │   ├─ local/                   Room: entities, DAOs, PizzeriaDatabase, mappers, DatabaseSeeder
+ │   ├─ MenuRepository.kt        dishes, favorites, recipes
+ │   ├─ InventoryRepository.kt   ingredients, transactions, restock / write-off
+ │   ├─ CartRepository.kt        cart lines (Room) + applied promo code
+ │   ├─ OrderRepository.kt       orders, place / cancel / repeat, order processing
+ │   ├─ SampleData.kt            first-launch data and static data (extras, promo codes)
+ │   └─ AppContainer.kt          manual dependency injection
+ └─ ui/
+     ├─ PizzeriaApp.kt           Scaffold, bottom bar with badges, NavHost
+     ├─ navigation/Routes.kt     type-safe routes
+     ├─ AppViewModelProvider.kt  ViewModel factory
+     ├─ common/UserMessages.kt   feedback messages from ViewModels to the snackbar
+     ├─ menu/ details/ editor/ cart/ checkout/ orders/ inventory/   screen + ViewModel per feature
+     ├─ components/              reusable composables
+     └─ theme/
+```
+
+- **UI.** Each feature has a stateful `XxxScreen` that gets its ViewModel and collects the state with `collectAsStateWithLifecycle()`, and a stateless `XxxContent` that only receives values and callbacks (state hoisting). Composables never touch repositories: every action is a ViewModel method (`viewModel::save`, `viewModel::applyOperation`, ...).
+- **ViewModels** combine repository flows with `combine` / `map` and expose one `StateFlow<XxxUiState>` with `stateIn(viewModelScope, WhileSubscribed(5000))`. Form state (dish and ingredient forms) lives in the ViewModel as a `MutableStateFlow`, so it survives rotation.
+- **Repositories** are the only classes that use DAOs. Reads are Room `Flow`s, so a change made on any screen reaches every other screen automatically. Writes are `suspend` functions that run in the application scope (`runDetached`), so a save or delete finishes even if the user leaves the screen right after the click.
+- **`Pizzeria` and `StockCalculator`** are plain Kotlin without Android dependencies and are covered by unit tests.
+
+### Room database
+
+| Table | What it stores | Relations |
+|---|---|---|
+| `menu_items` | dishes (type, name, price, description, toppings, flags, favorite) | |
+| `ingredients` | name, unit (g / ml / pcs), stock, low-stock threshold | |
+| `recipe_items` | amount of an ingredient per portion of a dish | FK to dish and ingredient, `CASCADE` |
+| `stock_transactions` | type (restock, write-off, order, return), delta, order id, note, time | FK to ingredient, `CASCADE` |
+| `cart_lines` | dish, size, extras, quantity | FK to dish, `CASCADE` |
+| `orders` | customer, delivery type, prices, promo code, status | |
+| `order_lines` | snapshot of the dish (name, type, price), size, extras, quantity | FK to order, `CASCADE`; read with `@Relation` |
+
+DAOs: `MenuDao`, `InventoryDao`, `CartDao`, `OrderDao`. Multi-step writes are `@Transaction` DAO methods or `withTransaction` blocks (saving a dish with its recipe, placing and cancelling an order, a restock or write-off together with the stock change). The dishes that use an ingredient are loaded with a `JOIN` query. The schema is exported to `app/schemas/`.
+
+On the first launch `DatabaseSeeder` fills the database with the menu, 26 ingredients (each starting amount is written as a transaction), and the recipes. Some ingredients start low on purpose (salami for 4 Diablo pizzas, lemons for 3 lemonades, no fruit for the fruit salad) so the feature is visible right away.
+
+### What survives a restart
+
+Menu changes, recipes, favorites, stock and its history, the cart and all orders. Orders that were being cooked or delivered when the app was closed continue from their saved status. Only the applied promo code is kept in memory.
+
+## Navigation
+
+| Route | Screen | Arguments |
+|---|---|---|
+| `MenuRoute` | menu (start, tab) | |
+| `CartRoute` | cart (tab) | |
+| `OrdersRoute` | orders (tab) | |
+| `InventoryRoute` | stock (tab) | |
+| `ItemDetailsRoute` | dish details | `itemId` |
+| `MenuItemEditRoute` | create / edit dish | `itemId` (0 = new) |
+| `CheckoutRoute` | checkout | |
+| `OrderDetailsRoute` | order tracking | `orderId` |
+| `IngredientDetailsRoute` | ingredient, history | `ingredientId` |
+| `IngredientEditRoute` | create / edit ingredient | `ingredientId` (0 = new) |
+
+Dish details link to the ingredients of the recipe, and an ingredient links back to the dishes that use it. After creating a dish or ingredient the form is replaced by its details screen (`popUpTo<...EditRoute> { inclusive = true }`); after editing, the form closes. Tabs keep their own back stack and scroll position.
+
+## State and configuration changes
+
+| Where | What |
+|---|---|
+| Room | everything the user creates or changes |
+| ViewModel | menu filters, form state of the dish / ingredient editors |
+| `SavedStateHandle` | selected size, extras and quantity on the details screen, delivery type at checkout, route arguments |
+| `rememberSaveable` | checkout fields, promo code input, open dialogs, typed values in the restock dialog |
+
+Rotating the device keeps the back stack, the ViewModels and all typed values.
+
+## Tests
+
+`./gradlew :app:testDebugUnitTest` runs JUnit tests for `StockCalculator` (requirements scaled by size, shortages, portions left, rounding) and for form validation (dish, drink, ingredient, restock and write-off rules).
+
+During development the whole flow was also run end to end in Robolectric with Compose UI tests: placing an order took the ingredients, cancelling returned them, restock, creating, validating and deleting a dish, and a second database instance confirmed that everything was written to disk. The screenshots above come from that run.
 
 ## How to run
 
@@ -38,89 +167,11 @@ Requirements: Android Studio (recent, AGP 9), JDK 21, Android SDK 36.
 
 From the command line: `./gradlew :app:installDebug`.
 
-## Architecture
-
-```
-app/src/main/java/com/example/
- ├─ MainActivity.kt              entry point, logs Activity lifecycle
- ├─ PizzeriaApplication.kt       creates the AppContainer
- ├─ contract/Preparable.kt       interface from HW1
- ├─ model/                       MenuItem / Pizza / Drink / Dessert, PizzaSize, Extra,
- │                               OrderLine, Order, PriceQuote, sealed OrderStatus, PromoCode
- ├─ service/Pizzeria.kt          business logic: search, price quote, stats, processOrder
- ├─ data/
- │   ├─ SampleData.kt            menu, extras, promo codes
- │   ├─ MenuRepository.kt        menu + favorites (StateFlow)
- │   ├─ CartRepository.kt        cart lines + applied promo (StateFlow)
- │   ├─ OrderRepository.kt       orders (StateFlow), runs order processing in an app scope
- │   └─ AppContainer.kt          manual dependency injection
- └─ ui/
-     ├─ PizzeriaApp.kt           Scaffold, bottom NavigationBar, NavHost
-     ├─ navigation/Routes.kt     type-safe routes and top-level tabs
-     ├─ AppViewModelProvider.kt  ViewModel factory (repositories + SavedStateHandle)
-     ├─ MainViewModel.kt         badges for the bottom bar
-     ├─ menu/  details/  cart/  checkout/  orders/   screen + ViewModel per feature
-     ├─ components/              reusable composables
-     └─ theme/Theme.kt           Material 3 color scheme (light + dark), shapes
-```
-
-Layers:
-
-- **UI** (composables) only draws state and sends events up. Each feature has a stateful `XxxScreen` that gets the ViewModel and collects its state, and a stateless `XxxContent` that receives values and callbacks (state hoisting).
-- **ViewModels** turn repository flows into a screen state with `combine` / `map` + `stateIn(viewModelScope, WhileSubscribed(5000))` and expose it as `StateFlow`. Screens collect it with `collectAsStateWithLifecycle()`, so collection stops when the app is in the background.
-- **Repositories** hold the shared app state in `MutableStateFlow` and are shared between screens (cart is changed on the menu, details, cart and order screens).
-- **`Pizzeria`** is plain Kotlin logic without Android dependencies.
-
-Order processing is a `suspend` function started in the application `CoroutineScope` inside `OrderRepository`, not in a ViewModel, because the order must keep going when the user leaves the screen and its ViewModel is cleared.
-
-## Navigation
-
-Navigation Compose with type-safe `@Serializable` routes:
-
-| Route | Screen | Arguments |
-|---|---|---|
-| `MenuRoute` | menu (start, tab) | |
-| `CartRoute` | cart (tab) | |
-| `OrdersRoute` | orders (tab) | |
-| `ItemDetailsRoute` | dish details | `itemId` |
-| `CheckoutRoute` | checkout | |
-| `OrderDetailsRoute` | order tracking | `orderId` |
-
-- Tabs are switched with `popUpTo(start) { saveState = true }`, `launchSingleTop` and `restoreState`, so each tab keeps its scroll and filters.
-- Arguments are read in the ViewModel with `savedStateHandle.toRoute<ItemDetailsRoute>()`.
-- After an order is placed, checkout and cart are removed from the back stack (`popUpTo(CartRoute) { inclusive = true }`), so "Back" from the order screen does not return to an empty checkout.
-- The bottom bar is shown only on top-level destinations.
-
-## State: remember, rememberSaveable, ViewModel
-
-| Where | What | Why |
-|---|---|---|
-| `remember` | `SnackbarHostState` on the menu | UI object, nothing to restore |
-| `rememberSaveable` | checkout fields, "submitted" flag, promo code input, cancel dialog | the user expects typed text and an open dialog to survive rotation and process death |
-| `SavedStateHandle` | selected size, extras and quantity on the details screen, delivery type at checkout | screen state that lives in the ViewModel but must survive process death |
-| ViewModel / repositories | menu filters, cart, favorites, orders | survive configuration changes, shared between screens |
-
-## Configuration changes
-
-Rotate the device at any step:
-
-- the back stack and the current tab stay (NavController state is saved);
-- ViewModels are reused: filters, search text, cart and selected options are kept;
-- typed checkout fields and validation errors are kept (`rememberSaveable`);
-- orders keep progressing, because the coroutine does not depend on the Activity.
-
-Logcat (tag `PizzeriaLifecycle`) shows `onDestroy, isChangingConfigurations=true` and a new `onCreate` on each rotation, while `MainViewModel created` appears only once.
-
-Data is kept in memory for now, so after the process is killed the cart and orders are empty. A database is planned for the second part of the course.
-
-## Reusable components
-
-`PizzeriaTopBar`, `SummaryBar`, `EmptyState`, `SectionTitle`, `InfoLabel`, `LabeledCheckbox`, `QuantityStepper`, `PriceRow`, `PriceBreakdown`, `SearchField`, `CategoryFilterRow`, `ToggleChip`, `MenuItemImage`, `FavoriteButton`, `ItemLabels`, `MenuItemCard`, `CartLineCard`, `PromoCodeField`, `OrderCard`, `StatusLabel`, `StatusTimeline`, `OrderLineRow`, `StatsCard`.
+The database is created on the first launch. To start over, clear the app data in the system settings.
 
 ## Kotlin features used
 
-- abstract class, inheritance and interface (`MenuItem`, `Pizza`, `Preparable`), enums with properties (`PizzaSize`, `Category`, `DeliveryType`), sealed class `OrderStatus` with exhaustive `when`, data classes with `copy`.
-- extension functions and properties (`priceFor`, `formatPrice`, `isVegetarian`, `toText`).
-- higher-order functions and lambdas (`filterMenu(predicate)`, promo code `discountRule`).
-- collections: `filter`, `map`, `groupBy`, `partition`, `sumOf`, `flatMap`, `mapValues`, sets of favorites and extras.
-- coroutines and flows: `delay`, `launch`, `Job.cancel`, `MutableStateFlow.update`, `combine`, `map`, `stateIn`.
+- abstract class, inheritance and interface (`MenuItem`, `Pizza`, `Preparable`), enums with properties, sealed classes (`OrderStatus`, `PlaceOrderResult`) with exhaustive `when`, data classes with `copy`.
+- extension functions and properties (`priceFor`, `portionFactor`, `formatAmount`, `toModel` / `toEntity` mappers).
+- higher-order functions and lambdas, collections (`groupBy`, `groupingBy().eachCount()`, `associateBy`, `partition`, `flatMap`, `minOf`, `sumOf`).
+- coroutines and flows: `suspend` DAO methods, Room `Flow`, `combine`, `stateIn`, `async` / `await` in the application scope, `cancelAndJoin`, `Channel` for one-time messages.
